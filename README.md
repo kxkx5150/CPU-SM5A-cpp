@@ -1,6 +1,6 @@
 # CPU-SM5A-cpp
 
-Sharp SM5 Microcontrollers
+Sharp SM5xx family
 
 <br>
 
