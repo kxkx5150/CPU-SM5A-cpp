@@ -18,6 +18,12 @@ void (*device_blit)(u16 *_fb);
 u32 gw_time_sync = 0;
 
 // button
+bool softkey_time_pressed  = 0;
+bool softkey_alarm_pressed = 0;
+bool softkey_A_pressed     = 0;
+bool softkey_only          = 0;
+bool set_watch             = false;
+
 short ashBotones[1 << 12];
 
 // sound
@@ -230,6 +236,8 @@ void gw_sound_submit()
 }
 void gw_input_keyboard(SDL_Event *event, bool keyup)
 {
+    set_watch = false;
+
     switch (event->key.keysym.sym) {
         case SDLK_LEFT:
             if (keyup)
@@ -255,8 +263,6 @@ void gw_input_keyboard(SDL_Event *event, bool keyup)
             else
                 ashBotones[GW_BUTTON_DOWN] = 1;
             break;
-
-
         case SDLK_q:
             if (keyup)
                 ashBotones[GW_BUTTON_PAUSE] = 0;
@@ -269,8 +275,6 @@ void gw_input_keyboard(SDL_Event *event, bool keyup)
             else
                 ashBotones[GW_BUTTON_POWER] = 1;
             break;
-
-
         case SDLK_z:
             if (keyup)
                 ashBotones[GW_BUTTON_GAME] = 0;
@@ -283,8 +287,6 @@ void gw_input_keyboard(SDL_Event *event, bool keyup)
             else
                 ashBotones[GW_BUTTON_TIME] = 1;
             break;
-
-
         case SDLK_a:
             if (keyup)
                 ashBotones[GW_BUTTON_A] = 0;
@@ -297,9 +299,6 @@ void gw_input_keyboard(SDL_Event *event, bool keyup)
             else
                 ashBotones[GW_BUTTON_B] = 1;
             break;
-
-
-
         case SDLK_c:
             if (keyup)
                 ashBotones[GW_BUTTON_STIME] = 0;
@@ -314,6 +313,9 @@ void gw_input_keyboard(SDL_Event *event, bool keyup)
             break;
 
 
+        case SDLK_t:
+            set_watch = true;
+            break;
         default:
             break;
     }
@@ -321,22 +323,29 @@ void gw_input_keyboard(SDL_Event *event, bool keyup)
 u32 gw_get_buttons()
 {
     u32 hw_buttons = 0;
-    hw_buttons |= ashBotones[GW_BUTTON_LEFT];
-    hw_buttons |= ashBotones[GW_BUTTON_UP] << 1;
-    hw_buttons |= ashBotones[GW_BUTTON_RIGHT] << 2;
-    hw_buttons |= ashBotones[GW_BUTTON_DOWN] << 3;
+    if (!softkey_only) {
+        hw_buttons |= ashBotones[GW_BUTTON_LEFT];
+        hw_buttons |= ashBotones[GW_BUTTON_UP] << 1;
+        hw_buttons |= ashBotones[GW_BUTTON_RIGHT] << 2;
+        hw_buttons |= ashBotones[GW_BUTTON_DOWN] << 3;
 
-    hw_buttons |= ashBotones[GW_BUTTON_A] << 4;
-    hw_buttons |= ashBotones[GW_BUTTON_B] << 5;
+        hw_buttons |= ashBotones[GW_BUTTON_A] << 4;
+        hw_buttons |= ashBotones[GW_BUTTON_B] << 5;
 
-    hw_buttons |= ashBotones[GW_BUTTON_TIME] << 6;
-    hw_buttons |= ashBotones[GW_BUTTON_GAME] << 7;
+        hw_buttons |= ashBotones[GW_BUTTON_TIME] << 6;
+        hw_buttons |= ashBotones[GW_BUTTON_GAME] << 7;
 
-    hw_buttons |= ashBotones[GW_BUTTON_PAUSE] << 8;
-    hw_buttons |= ashBotones[GW_BUTTON_POWER] << 9;
+        hw_buttons |= ashBotones[GW_BUTTON_PAUSE] << 8;
+        hw_buttons |= ashBotones[GW_BUTTON_POWER] << 9;
 
-    hw_buttons |= ashBotones[GW_BUTTON_STIME] << 10;
-    hw_buttons |= ashBotones[GW_BUTTON_SALARM] << 11;
+        hw_buttons |= ashBotones[GW_BUTTON_STIME] << 10;
+        hw_buttons |= ashBotones[GW_BUTTON_SALARM] << 11;
+    }
+    // software keys
+    hw_buttons |= ((unsigned int)softkey_A_pressed) << 4;
+    hw_buttons |= ((unsigned int)softkey_time_pressed) << 10;
+    hw_buttons |= ((unsigned int)softkey_alarm_pressed) << 11;
+
     return hw_buttons;
 }
 u8 gw_readB()
@@ -366,17 +375,19 @@ u8 gw_readK(u8 io_S)
     u8  io_K           = 0;
     u32 key_soft_value = 0;
     u32 keys_pressed   = gw_get_buttons() & 0xffff;
-
     if (keys_pressed == 0)
-        return 0;
+        return set_watch ? 1 : 0;
+
+    const unsigned int key_soft_time  = GW_BUTTON_B + GW_BUTTON_TIME;
+    const unsigned int key_soft_alarm = GW_BUTTON_B + GW_BUTTON_GAME;
 
     if ((keys_pressed >> 10) & 1) {
         keys_pressed   = 0;
-        key_soft_value = GW_BUTTON_B + GW_BUTTON_TIME;
+        key_soft_value = key_soft_time;
     }
     if ((keys_pressed >> 11) & 1) {
         keys_pressed   = 0;
-        key_soft_value = GW_BUTTON_B + GW_BUTTON_GAME;
+        key_soft_value = key_soft_alarm;
     }
 
     for (int Sx = 0; Sx < 8; Sx++) {
@@ -395,13 +406,25 @@ u8 gw_readK(u8 io_S)
                     io_K |= 0x8;
             } else {
                 if (((gw_keyboard[Sx] & GW_MASK_K1) & (keys_pressed)) != 0)
-                    io_K |= 0x1;
+                    if (((gw_keyboard[Sx] & GW_MASK_K1) != (key_soft_alarm)) &
+                        ((gw_keyboard[Sx] & GW_MASK_K1) != (key_soft_time)))
+                        io_K |= 0x1;
+
                 if (((gw_keyboard[Sx] & GW_MASK_K2) & (keys_pressed << 8)) != 0)
-                    io_K |= 0x2;
+                    if (((gw_keyboard[Sx] & GW_MASK_K2) != (key_soft_alarm << 8)) &
+                        ((gw_keyboard[Sx] & GW_MASK_K2) != (key_soft_time << 8)))
+
+                        io_K |= 0x2;
                 if (((gw_keyboard[Sx] & GW_MASK_K3) & (keys_pressed << 16)) != 0)
-                    io_K |= 0x4;
+                    if (((gw_keyboard[Sx] & GW_MASK_K3) != (key_soft_alarm << 16)) &
+                        ((gw_keyboard[Sx] & GW_MASK_K3) != (key_soft_time << 16)))
+
+                        io_K |= 0x4;
                 if (((gw_keyboard[Sx] & GW_MASK_K4) & (keys_pressed << 24)) != 0)
-                    io_K |= 0x8;
+                    if (((gw_keyboard[Sx] & GW_MASK_K4) != (key_soft_alarm << 24)) &
+                        ((gw_keyboard[Sx] & GW_MASK_K4) != (key_soft_time << 24)))
+
+                        io_K |= 0x8;
             }
         }
     }
@@ -517,15 +540,19 @@ int gw_system_run(int clock_cycles)
 }
 void gw_mainloop(SDL_Window *window, SDL_Renderer *renderer, SDL_Texture *tex)
 {
+    softkey_time_pressed  = 0;
+    softkey_alarm_pressed = 0;
+    softkey_A_pressed     = 0;
+
     gw_sound_init();
     gw_system_config();
     gw_system_start();
     gw_system_reset();
     gw_check_time();
     gw_set_time();
-
     DACInit();
 
+    printf("loop start\n");
     uint16_t  fb[GW_LCD_WIDTH * GW_LCD_HEIGHT];
     uint32_t  last_tic = SDL_GetTicks();
     bool      Running  = true;
@@ -534,9 +561,8 @@ void gw_mainloop(SDL_Window *window, SDL_Renderer *renderer, SDL_Texture *tex)
 
     while (Running) {
         if ((SDL_GetTicks() - last_tic) >= 1000.0 / 160.0) {
-            if (count % 2 == 0) {
+            if (count % 2 == 0)
                 gw_check_time();
-            }
 
             gw_system_run(GW_SYSTEM_CYCLES);
             gw_sound_submit();
@@ -566,8 +592,8 @@ void gw_mainloop(SDL_Window *window, SDL_Renderer *renderer, SDL_Texture *tex)
 int gw_init(int argc, char **argv)
 {
     u8  *rom    = nullptr;
-    int  size   = 0;
     bool romflg = false;
+    int  size   = 0;
 
     if (argv[1]) {
         FILE *f = fopen(argv[1], "rb");
