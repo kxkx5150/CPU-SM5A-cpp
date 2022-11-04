@@ -68,6 +68,15 @@
 #define GW_ROM_LZ4_SUPPORT
 #define GW_ROM_SIZE_MAX (uint32_t)(400000)
 
+#define GW_AUDIO_VOLUME_MAX     100
+#define ODROID_AUDIO_VOLUME_MIN 0
+#define BUFFER_SIZE             0x800000
+
+typedef enum
+{
+    DMA_TRANSFER_STATE_HF = 0x00,
+    DMA_TRANSFER_STATE_TC = 0x01,
+} dma_trans_state;
 
 typedef unsigned char  byte;
 typedef unsigned char  un8, u8, uint8;

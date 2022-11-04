@@ -14,8 +14,32 @@ void (*device_start)();
 void (*device_run)();
 void (*device_blit)(u16 *_fb);
 
-u32   gw_time_sync = 0;
+u32 gw_time_sync = 0;
+
+// button
 short ashBotones[256];
+
+// sound
+dma_trans_state dma_state;
+unsigned char   mspeaker_data       = 0;
+int             gw_audio_buffer_idx = 0;
+bool            gw_audio_buffer_copied;
+
+unsigned char gw_audio_buffer[GW_AUDIO_BUFFER_LENGTH * 2] = {0};
+int16_t       audiobuffer_dma[0x800000]                   = {0};
+
+uint32        LeftFIFOHeadPtr = 0, LeftFIFOTailPtr = 0, RightFIFOHeadPtr = 0, RightFIFOTailPtr = 0;
+bool          bAudioYaInicializado = 0;
+uint32_t      audio_mute;
+SDL_AudioSpec desired;
+uint16       *DACBuffer;
+
+const uint8_t volume_tbl[GW_AUDIO_VOLUME_MAX + 1] = {
+    (uint8_t)(UINT8_MAX * 0.00f),  (uint8_t)(UINT8_MAX * 0.06f), (uint8_t)(UINT8_MAX * 0.125f),
+    (uint8_t)(UINT8_MAX * 0.187f), (uint8_t)(UINT8_MAX * 0.25f), (uint8_t)(UINT8_MAX * 0.35f),
+    (uint8_t)(UINT8_MAX * 0.42f),  (uint8_t)(UINT8_MAX * 0.60f), (uint8_t)(UINT8_MAX * 0.80f),
+    (uint8_t)(UINT8_MAX * 1.00f),
+};
 
 
 bool gw_system_config()
@@ -66,16 +90,145 @@ void gw_system_start()
 {
     device_start();
 }
+void SDLSoundCallback(void *userdata, Uint8 *buffer, int length)
+{
+    int iCopyAux, iCopyTotal;
+    if (LeftFIFOHeadPtr != LeftFIFOTailPtr) {
+
+        int numLeftSamplesReady =
+            (LeftFIFOTailPtr + (LeftFIFOTailPtr < LeftFIFOHeadPtr ? BUFFER_SIZE : 0)) - LeftFIFOHeadPtr;
+
+        int numSamplesReady = numLeftSamplesReady;
+
+        if (numSamplesReady > length / 2)
+            numSamplesReady = length / 2;
+
+
+        iCopyAux = BUFFER_SIZE - (LeftFIFOHeadPtr + numSamplesReady);
+        if (iCopyAux >= 0) {
+
+            memcpy(buffer, &DACBuffer[LeftFIFOHeadPtr], numSamplesReady * sizeof(uint16));
+        } else {
+            iCopyTotal = numSamplesReady + iCopyAux;
+
+            memcpy(buffer, &DACBuffer[LeftFIFOHeadPtr], iCopyTotal * sizeof(uint16));
+            memcpy(&buffer[iCopyTotal * sizeof(uint16)], &DACBuffer[0],
+                   (numSamplesReady - iCopyTotal) * sizeof(uint16));
+        }
+
+        LeftFIFOHeadPtr = (LeftFIFOHeadPtr + numSamplesReady) % BUFFER_SIZE;
+    }
+}
+void DACReset(void)
+{
+    LeftFIFOHeadPtr = LeftFIFOTailPtr = 0, RightFIFOHeadPtr = RightFIFOTailPtr = 1;
+}
+void DACInit(void)
+{
+    DACBuffer        = (uint16 *)malloc(BUFFER_SIZE * sizeof(uint16));
+    desired.freq     = 11025;
+    desired.format   = AUDIO_S16SYS;
+    desired.channels = 1;
+    desired.samples  = (11025 / 90);
+    desired.callback = SDLSoundCallback;
+
+    if (bAudioYaInicializado == 0) {
+        if (SDL_OpenAudio(&desired, NULL) < 0) {
+            exit(1);
+        }
+        bAudioYaInicializado = 1;
+    }
+
+    DACReset();
+    SDL_PauseAudio(0);
+}
+void DACDone(void)
+{
+    SDL_PauseAudio(1);
+    SDL_CloseAudio();
+}
 void gw_system_sound_init()
 {
+    memset(gw_audio_buffer, 0, sizeof(gw_audio_buffer));
+    gw_audio_buffer_copied = false;
+    gw_audio_buffer_idx    = 0;
+    mspeaker_data          = 0;
 }
 void gw_sound_melody(u8 data)
 {
+    if (gw_audio_buffer_copied) {
+        gw_audio_buffer_copied = false;
+        gw_audio_buffer_idx    = gw_audio_buffer_idx - GW_AUDIO_BUFFER_LENGTH;
+
+        if (gw_audio_buffer_idx < 0)
+            gw_audio_buffer_idx = 0;
+
+        if (gw_audio_buffer_idx != 0) {
+            for (int i = 0; i < gw_audio_buffer_idx; i++)
+                gw_audio_buffer[i] = gw_audio_buffer[i + GW_AUDIO_BUFFER_LENGTH];
+        }
+    }
+
+    if (gw_melody != 0)
+        mspeaker_data = data;
+    else {
+        switch (gw_head.flags & FLAG_SOUND_MASK) {
+            case FLAG_SOUND_R1_PIEZO:
+                mspeaker_data = data & 1;
+                break;
+            case FLAG_SOUND_R2_PIEZO:
+                mspeaker_data = data >> 1 & 1;
+                break;
+            case FLAG_SOUND_R1R2_PIEZO:
+                mspeaker_data = data & 3;
+                break;
+            case FLAG_SOUND_R1S1_PIEZO:
+                mspeaker_data = (m_s_out & ~1) | (data & 1);
+                break;
+            case FLAG_SOUND_S1R1_PIEZO:
+                mspeaker_data = (m_s_out & ~2) | (data << 1 & 2);
+                break;
+            default:
+                mspeaker_data = data & 1;
+        }
+    }
+
+    gw_audio_buffer[gw_audio_buffer_idx] = mspeaker_data;
+    gw_audio_buffer_idx++;
 }
 void gw_writeR(u8 data)
 {
     gw_sound_melody(data);
 };
+void vdXboxPlaySound(uint8_t *pucBuffer)
+{
+    memcpy(&DACBuffer[LeftFIFOHeadPtr], audiobuffer_dma, GW_AUDIO_BUFFER_LENGTH);
+    LeftFIFOTailPtr = (LeftFIFOTailPtr + GW_AUDIO_BUFFER_LENGTH / 2) % BUFFER_SIZE;
+}
+void gw_sound_init()
+{
+    gw_system_sound_init();
+    memset(audiobuffer_dma, 0, sizeof(audiobuffer_dma));
+}
+void gw_sound_submit()
+{
+    uint8_t volume = 7;
+    int16_t factor = volume_tbl[volume];
+    size_t  offset = (dma_state == DMA_TRANSFER_STATE_HF) ? 0 : GW_AUDIO_BUFFER_LENGTH;
+
+    if (audio_mute || volume == ODROID_AUDIO_VOLUME_MIN) {
+        for (int i = 0; i < GW_AUDIO_BUFFER_LENGTH; i++) {
+            audiobuffer_dma[i + offset] = 0;
+        }
+    } else {
+        for (int i = 0; i < GW_AUDIO_BUFFER_LENGTH; i++) {
+            audiobuffer_dma[i + offset] = (factor) * (gw_audio_buffer[i] << 4);
+        }
+    }
+
+    gw_audio_buffer_copied = true;
+    vdXboxPlaySound((uint8_t *)audiobuffer_dma);
+}
 u32 gw_get_buttons()
 {
     unsigned int hw_buttons = 0;
@@ -308,21 +461,20 @@ void gw_input_keyboard(SDL_Event *event, bool keyup)
             else
                 ashBotones[GW_BUTTON_DOWN] = 1;
             break;
-
-
-
-
         default:
             break;
     }
 }
 void gw_mainloop(SDL_Window *window, SDL_Renderer *renderer, SDL_Texture *tex)
 {
+    gw_sound_init();
     gw_system_config();
     gw_system_start();
     gw_system_reset();
     gw_check_time();
     gw_set_time();
+
+    DACInit();
 
     uint16_t  fb[GW_LCD_WIDTH * GW_LCD_HEIGHT];
     uint32_t  last_tic = SDL_GetTicks();
@@ -332,15 +484,18 @@ void gw_mainloop(SDL_Window *window, SDL_Renderer *renderer, SDL_Texture *tex)
 
     while (Running) {
         if ((SDL_GetTicks() - last_tic) >= 1000.0 / 160.0) {
-            if (count % 2 == 0)
-                gw_check_time();
-
             gw_system_run(GW_SYSTEM_CYCLES);
 
             device_blit(fb);
             SDL_UpdateTexture(tex, NULL, fb, FRAME_PITCH);
             SDL_RenderCopy(renderer, tex, NULL, NULL);
             SDL_RenderPresent(renderer);
+
+            if (count % 2 == 0) {
+                gw_check_time();
+            }
+            gw_sound_submit();
+
             last_tic = SDL_GetTicks();
         }
 
