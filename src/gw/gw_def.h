@@ -1,5 +1,6 @@
 #ifndef __GW_TYPE_DEFS_H__
 #define __GW_TYPE_DEFS_H__
+#include <cstdint>
 #include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
@@ -11,7 +12,7 @@
 #define GW_SCREEN_WIDTH  320
 #define GW_SCREEN_HEIGHT 240
 #define GW_REFRESH_RATE  128
-#define SCALE            2
+#define SCALE            1
 #define FRAME_PITCH      (GW_LCD_WIDTH * sizeof(uint16_t))
 
 #define GW_SYS_FREQ            32768U
@@ -19,16 +20,18 @@
 #define GW_AUDIO_BUFFER_LENGTH (GW_AUDIO_FREQ / GW_REFRESH_RATE)
 #define GW_SYSTEM_CYCLES       (GW_AUDIO_FREQ / GW_REFRESH_RATE)
 
-#define GW_BUTTON_LEFT  1
-#define GW_BUTTON_UP    (1 << 1)
-#define GW_BUTTON_RIGHT (1 << 2)
-#define GW_BUTTON_DOWN  (1 << 3)
-#define GW_BUTTON_A     (1 << 4)
-#define GW_BUTTON_B     (1 << 5)
-#define GW_BUTTON_TIME  (1 << 6)
-#define GW_BUTTON_GAME  (1 << 7)
-#define GW_BUTTON_PAUSE (1 << 8)
-#define GW_BUTTON_POWER (1 << 9)
+#define GW_BUTTON_LEFT   1
+#define GW_BUTTON_UP     (1 << 1)
+#define GW_BUTTON_RIGHT  (1 << 2)
+#define GW_BUTTON_DOWN   (1 << 3)
+#define GW_BUTTON_A      (1 << 4)
+#define GW_BUTTON_B      (1 << 5)
+#define GW_BUTTON_TIME   (1 << 6)
+#define GW_BUTTON_GAME   (1 << 7)
+#define GW_BUTTON_PAUSE  (1 << 8)
+#define GW_BUTTON_POWER  (1 << 9)
+#define GW_BUTTON_STIME  (1 << 10)
+#define GW_BUTTON_SALARM (1 << 11)
 
 #define GW_MASK_K1    0x000000ff
 #define GW_MASK_K2    0x0000ff00
@@ -84,11 +87,13 @@ typedef unsigned char  byte;
 typedef unsigned char  un8, u8, uint8;
 typedef unsigned short un16, u16, uint16;
 typedef unsigned int   un32, u32, uint32;
-typedef signed char    n8;
-typedef signed short   n16;
-typedef signed int     n32;
-typedef un16           word;
-typedef word           addr;
+typedef uint64_t       un64, u64, uint64;
+
+typedef signed char  n8;
+typedef signed short n16;
+typedef signed int   n32;
+typedef un16         word;
+typedef word         addr;
 
 typedef int8_t  s8;
 typedef int16_t s16;

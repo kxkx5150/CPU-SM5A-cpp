@@ -1,4 +1,5 @@
 #include <SDL2/SDL_keycode.h>
+#include <cstdio>
 #include <time.h>
 #include <SDL2/SDL.h>
 #include "gw_romloader.h"
@@ -17,7 +18,7 @@ void (*device_blit)(u16 *_fb);
 u32 gw_time_sync = 0;
 
 // button
-short ashBotones[1 << 10];
+short ashBotones[1 << 12];
 
 // sound
 dma_trans_state dma_state;
@@ -106,11 +107,9 @@ void SDLSoundCallback(void *userdata, Uint8 *buffer, int length)
 
         iCopyAux = BUFFER_SIZE - (LeftFIFOHeadPtr + numSamplesReady);
         if (iCopyAux >= 0) {
-
             memcpy(buffer, &DACBuffer[LeftFIFOHeadPtr], numSamplesReady * sizeof(uint16));
         } else {
             iCopyTotal = numSamplesReady + iCopyAux;
-
             memcpy(buffer, &DACBuffer[LeftFIFOHeadPtr], iCopyTotal * sizeof(uint16));
             memcpy(&buffer[iCopyTotal * sizeof(uint16)], &DACBuffer[0],
                    (numSamplesReady - iCopyTotal) * sizeof(uint16));
@@ -299,14 +298,29 @@ void gw_input_keyboard(SDL_Event *event, bool keyup)
                 ashBotones[GW_BUTTON_B] = 1;
             break;
 
+
+
+        case SDLK_c:
+            if (keyup)
+                ashBotones[GW_BUTTON_STIME] = 0;
+            else
+                ashBotones[GW_BUTTON_STIME] = 1;
+            break;
+        case SDLK_v:
+            if (keyup)
+                ashBotones[GW_BUTTON_SALARM] = 0;
+            else
+                ashBotones[GW_BUTTON_SALARM] = 1;
+            break;
+
+
         default:
             break;
     }
 }
 u32 gw_get_buttons()
 {
-    unsigned int hw_buttons = 0;
-
+    u32 hw_buttons = 0;
     hw_buttons |= ashBotones[GW_BUTTON_LEFT];
     hw_buttons |= ashBotones[GW_BUTTON_UP] << 1;
     hw_buttons |= ashBotones[GW_BUTTON_RIGHT] << 2;
@@ -321,6 +335,8 @@ u32 gw_get_buttons()
     hw_buttons |= ashBotones[GW_BUTTON_PAUSE] << 8;
     hw_buttons |= ashBotones[GW_BUTTON_POWER] << 9;
 
+    hw_buttons |= ashBotones[GW_BUTTON_STIME] << 10;
+    hw_buttons |= ashBotones[GW_BUTTON_SALARM] << 11;
     return hw_buttons;
 }
 u8 gw_readB()
@@ -347,30 +363,46 @@ u8 gw_readBA()
 }
 u8 gw_readK(u8 io_S)
 {
-    unsigned char io_K         = 0;
-    unsigned int  keys_pressed = gw_get_buttons() & 0xff;
+    u8  io_K           = 0;
+    u32 key_soft_value = 0;
+    u32 keys_pressed   = gw_get_buttons() & 0xffff;
+
     if (keys_pressed == 0)
         return 0;
 
+    if ((keys_pressed >> 10) & 1) {
+        keys_pressed   = 0;
+        key_soft_value = GW_BUTTON_B + GW_BUTTON_TIME;
+    }
+    if ((keys_pressed >> 11) & 1) {
+        keys_pressed   = 0;
+        key_soft_value = GW_BUTTON_B + GW_BUTTON_GAME;
+    }
+
     for (int Sx = 0; Sx < 8; Sx++) {
+        if (io_S == 0)
+            io_S = 2;
+
         if (((io_S >> Sx) & 0x1) != 0) {
-            if (((gw_keyboard[Sx] & GW_MASK_K1) & (keys_pressed)) != 0)
-                io_K |= 0x1;
-            if (((gw_keyboard[Sx] & GW_MASK_K2) & (keys_pressed << 8)) != 0)
-                io_K |= 0x2;
-            if (((gw_keyboard[Sx] & GW_MASK_K3) & (keys_pressed << 16)) != 0)
-                io_K |= 0x4;
-            if (((gw_keyboard[Sx] & GW_MASK_K4) & (keys_pressed << 24)) != 0)
-                io_K |= 0x8;
-        } else if (io_S == 0) {
-            if (((gw_keyboard[1] & GW_MASK_K1) & (keys_pressed)) != 0)
-                io_K |= 0x1;
-            if (((gw_keyboard[1] & GW_MASK_K2) & (keys_pressed << 8)) != 0)
-                io_K |= 0x2;
-            if (((gw_keyboard[1] & GW_MASK_K3) & (keys_pressed << 16)) != 0)
-                io_K |= 0x4;
-            if (((gw_keyboard[1] & GW_MASK_K4) & (keys_pressed << 24)) != 0)
-                io_K |= 0x8;
+            if (key_soft_value != 0) {
+                if (((gw_keyboard[Sx] & GW_MASK_K1) == (key_soft_value)))
+                    io_K |= 0x1;
+                if (((gw_keyboard[Sx] & GW_MASK_K2) == (key_soft_value << 8)))
+                    io_K |= 0x2;
+                if (((gw_keyboard[Sx] & GW_MASK_K3) == (key_soft_value << 16)))
+                    io_K |= 0x4;
+                if (((gw_keyboard[Sx] & GW_MASK_K4) == (key_soft_value << 24)))
+                    io_K |= 0x8;
+            } else {
+                if (((gw_keyboard[Sx] & GW_MASK_K1) & (keys_pressed)) != 0)
+                    io_K |= 0x1;
+                if (((gw_keyboard[Sx] & GW_MASK_K2) & (keys_pressed << 8)) != 0)
+                    io_K |= 0x2;
+                if (((gw_keyboard[Sx] & GW_MASK_K3) & (keys_pressed << 16)) != 0)
+                    io_K |= 0x4;
+                if (((gw_keyboard[Sx] & GW_MASK_K4) & (keys_pressed << 24)) != 0)
+                    io_K |= 0x8;
+            }
         }
     }
     return io_K & 0xf;
