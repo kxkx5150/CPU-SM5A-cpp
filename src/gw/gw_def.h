@@ -27,11 +27,12 @@
 #define GW_BUTTON_B     (1 << 5)
 #define GW_BUTTON_TIME  (1 << 6)
 #define GW_BUTTON_GAME  (1 << 7)
-#define GW_MASK_K1      0x000000ff
-#define GW_MASK_K2      0x0000ff00
-#define GW_MASK_K3      0x00ff0000
-#define GW_MASK_K4      0xff000000
-#define GW_MAGIC_WORD   "G&WS\x00\x00\x00\x05"
+
+#define GW_MASK_K1    0x000000ff
+#define GW_MASK_K2    0x0000ff00
+#define GW_MASK_K3    0x00ff0000
+#define GW_MASK_K4    0xff000000
+#define GW_MAGIC_WORD "G&WS\x00\x00\x00\x05"
 
 // rom
 #define ZLIB_MAGIC "ZLIB"
