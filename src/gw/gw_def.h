@@ -27,6 +27,8 @@
 #define GW_BUTTON_B     (1 << 5)
 #define GW_BUTTON_TIME  (1 << 6)
 #define GW_BUTTON_GAME  (1 << 7)
+#define GW_BUTTON_PAUSE (1 << 8)
+#define GW_BUTTON_POWER (1 << 9)
 
 #define GW_MASK_K1    0x000000ff
 #define GW_MASK_K2    0x0000ff00

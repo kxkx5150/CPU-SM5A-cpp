@@ -17,7 +17,7 @@ void (*device_blit)(u16 *_fb);
 u32 gw_time_sync = 0;
 
 // button
-short ashBotones[256];
+short ashBotones[1 << 10];
 
 // sound
 dma_trans_state dma_state;
@@ -229,9 +229,84 @@ void gw_sound_submit()
     gw_audio_buffer_copied = true;
     vdXboxPlaySound((uint8_t *)audiobuffer_dma);
 }
+void gw_input_keyboard(SDL_Event *event, bool keyup)
+{
+    switch (event->key.keysym.sym) {
+        case SDLK_LEFT:
+            if (keyup)
+                ashBotones[GW_BUTTON_LEFT] = 0;
+            else
+                ashBotones[GW_BUTTON_LEFT] = 1;
+            break;
+        case SDLK_RIGHT:
+            if (keyup)
+                ashBotones[GW_BUTTON_RIGHT] = 0;
+            else
+                ashBotones[GW_BUTTON_RIGHT] = 1;
+            break;
+        case SDLK_UP:
+            if (keyup)
+                ashBotones[GW_BUTTON_UP] = 0;
+            else
+                ashBotones[GW_BUTTON_UP] = 1;
+            break;
+        case SDLK_DOWN:
+            if (keyup)
+                ashBotones[GW_BUTTON_DOWN] = 0;
+            else
+                ashBotones[GW_BUTTON_DOWN] = 1;
+            break;
+
+
+        case SDLK_q:
+            if (keyup)
+                ashBotones[GW_BUTTON_PAUSE] = 0;
+            else
+                ashBotones[GW_BUTTON_PAUSE] = 1;
+            break;
+        case SDLK_w:
+            if (keyup)
+                ashBotones[GW_BUTTON_POWER] = 0;
+            else
+                ashBotones[GW_BUTTON_POWER] = 1;
+            break;
+
+
+        case SDLK_z:
+            if (keyup)
+                ashBotones[GW_BUTTON_GAME] = 0;
+            else
+                ashBotones[GW_BUTTON_GAME] = 1;
+            break;
+        case SDLK_x:
+            if (keyup)
+                ashBotones[GW_BUTTON_TIME] = 0;
+            else
+                ashBotones[GW_BUTTON_TIME] = 1;
+            break;
+
+
+        case SDLK_a:
+            if (keyup)
+                ashBotones[GW_BUTTON_A] = 0;
+            else
+                ashBotones[GW_BUTTON_A] = 1;
+            break;
+        case SDLK_s:
+            if (keyup)
+                ashBotones[GW_BUTTON_B] = 0;
+            else
+                ashBotones[GW_BUTTON_B] = 1;
+            break;
+
+        default:
+            break;
+    }
+}
 u32 gw_get_buttons()
 {
     unsigned int hw_buttons = 0;
+
     hw_buttons |= ashBotones[GW_BUTTON_LEFT];
     hw_buttons |= ashBotones[GW_BUTTON_UP] << 1;
     hw_buttons |= ashBotones[GW_BUTTON_RIGHT] << 2;
@@ -242,6 +317,9 @@ u32 gw_get_buttons()
 
     hw_buttons |= ashBotones[GW_BUTTON_TIME] << 6;
     hw_buttons |= ashBotones[GW_BUTTON_GAME] << 7;
+
+    hw_buttons |= ashBotones[GW_BUTTON_PAUSE] << 8;
+    hw_buttons |= ashBotones[GW_BUTTON_POWER] << 9;
 
     return hw_buttons;
 }
@@ -313,6 +391,7 @@ gw_time_t gw_system_get_time()
     u32 hour_msb = gw_ram[gw_head.time_hour_address_msb];
     u32 hour_lsb = gw_ram[gw_head.time_hour_address_lsb];
     u32 pm_flag  = gw_head.time_hour_msb_pm;
+
     time.minutes = (gw_ram[gw_head.time_min_address_msb] * 10) + gw_ram[gw_head.time_min_address_lsb];
     time.seconds = (gw_ram[gw_head.time_sec_address_msb] * 10) + gw_ram[gw_head.time_sec_address_lsb];
 
@@ -395,7 +474,6 @@ void gw_check_time()
 int gw_system_run(int clock_cycles)
 {
     m_k_active = (gw_get_buttons() != 0);
-
     if (m_clk_div == 2)
         m_icount += (clock_cycles / 2);
 
@@ -404,66 +482,6 @@ int gw_system_run(int clock_cycles)
 
     device_run();
     return m_icount * m_clk_div;
-}
-void gw_input_keyboard(SDL_Event *event, bool keyup)
-{
-    switch (event->key.keysym.sym) {
-        case SDLK_z:
-            if (keyup)
-                ashBotones[GW_BUTTON_GAME] = 0;
-            else
-                ashBotones[GW_BUTTON_GAME] = 1;
-            break;
-        case SDLK_x:
-            if (keyup)
-                ashBotones[GW_BUTTON_TIME] = 0;
-            else
-                ashBotones[GW_BUTTON_TIME] = 1;
-            break;
-
-
-        case SDLK_a:
-            if (keyup)
-                ashBotones[GW_BUTTON_A] = 0;
-            else
-                ashBotones[GW_BUTTON_A] = 1;
-            break;
-        case SDLK_s:
-            if (keyup)
-                ashBotones[GW_BUTTON_B] = 0;
-            else
-                ashBotones[GW_BUTTON_B] = 1;
-            break;
-
-
-
-        case SDLK_LEFT:
-            if (keyup)
-                ashBotones[GW_BUTTON_LEFT] = 0;
-            else
-                ashBotones[GW_BUTTON_LEFT] = 1;
-            break;
-        case SDLK_RIGHT:
-            if (keyup)
-                ashBotones[GW_BUTTON_RIGHT] = 0;
-            else
-                ashBotones[GW_BUTTON_RIGHT] = 1;
-            break;
-        case SDLK_UP:
-            if (keyup)
-                ashBotones[GW_BUTTON_UP] = 0;
-            else
-                ashBotones[GW_BUTTON_UP] = 1;
-            break;
-        case SDLK_DOWN:
-            if (keyup)
-                ashBotones[GW_BUTTON_DOWN] = 0;
-            else
-                ashBotones[GW_BUTTON_DOWN] = 1;
-            break;
-        default:
-            break;
-    }
 }
 void gw_mainloop(SDL_Window *window, SDL_Renderer *renderer, SDL_Texture *tex)
 {
@@ -484,18 +502,17 @@ void gw_mainloop(SDL_Window *window, SDL_Renderer *renderer, SDL_Texture *tex)
 
     while (Running) {
         if ((SDL_GetTicks() - last_tic) >= 1000.0 / 160.0) {
+            if (count % 2 == 0) {
+                gw_check_time();
+            }
+
             gw_system_run(GW_SYSTEM_CYCLES);
+            gw_sound_submit();
 
             device_blit(fb);
             SDL_UpdateTexture(tex, NULL, fb, FRAME_PITCH);
             SDL_RenderCopy(renderer, tex, NULL, NULL);
             SDL_RenderPresent(renderer);
-
-            if (count % 2 == 0) {
-                gw_check_time();
-            }
-            gw_sound_submit();
-
             last_tic = SDL_GetTicks();
         }
 
