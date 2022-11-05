@@ -9,7 +9,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/exe/cpp_app",
-            "args": [],
+            "args": ["${workspaceFolder}/rom/op.gw"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],

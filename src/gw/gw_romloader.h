@@ -70,6 +70,7 @@ extern u32 *gw_segments_offset;
 extern u8  *gw_program;
 extern u8  *gw_melody;
 extern u32 *gw_keyboard;
+extern bool gw_rotate;
 
 extern gwromheader_t gw_head;
 

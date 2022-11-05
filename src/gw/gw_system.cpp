@@ -324,10 +324,18 @@ u32 gw_get_buttons()
 {
     u32 hw_buttons = 0;
     if (!softkey_only) {
-        hw_buttons |= ashBotones[GW_BUTTON_LEFT];
-        hw_buttons |= ashBotones[GW_BUTTON_UP] << 1;
-        hw_buttons |= ashBotones[GW_BUTTON_RIGHT] << 2;
-        hw_buttons |= ashBotones[GW_BUTTON_DOWN] << 3;
+        if (gw_rotate) {
+            hw_buttons |= ashBotones[GW_BUTTON_DOWN];
+            hw_buttons |= ashBotones[GW_BUTTON_LEFT] << 1;
+            hw_buttons |= ashBotones[GW_BUTTON_UP] << 2;
+            hw_buttons |= ashBotones[GW_BUTTON_RIGHT] << 3;
+        } else {
+            hw_buttons |= ashBotones[GW_BUTTON_LEFT];
+            hw_buttons |= ashBotones[GW_BUTTON_UP] << 1;
+            hw_buttons |= ashBotones[GW_BUTTON_RIGHT] << 2;
+            hw_buttons |= ashBotones[GW_BUTTON_DOWN] << 3;
+        }
+
 
         hw_buttons |= ashBotones[GW_BUTTON_A] << 4;
         hw_buttons |= ashBotones[GW_BUTTON_B] << 5;
@@ -540,6 +548,7 @@ int gw_system_run(int clock_cycles)
 }
 void gw_mainloop(SDL_Window *window, SDL_Renderer *renderer, SDL_Texture *tex)
 {
+
     softkey_time_pressed  = 0;
     softkey_alarm_pressed = 0;
     softkey_A_pressed     = 0;
@@ -553,7 +562,7 @@ void gw_mainloop(SDL_Window *window, SDL_Renderer *renderer, SDL_Texture *tex)
     DACInit();
 
     printf("loop start\n");
-    uint16_t  fb[GW_LCD_WIDTH * GW_LCD_HEIGHT];
+    uint16_t  fb[GW_LCD_WIDTH * GW_LCD_WIDTH];
     uint32_t  last_tic = SDL_GetTicks();
     bool      Running  = true;
     uint64_t  count    = 0;
@@ -569,7 +578,17 @@ void gw_mainloop(SDL_Window *window, SDL_Renderer *renderer, SDL_Texture *tex)
 
             device_blit(fb);
             SDL_UpdateTexture(tex, NULL, fb, FRAME_PITCH);
-            SDL_RenderCopy(renderer, tex, NULL, NULL);
+
+            if (gw_rotate) {
+                SDL_Rect srcrect;
+                srcrect.x = 0;
+                srcrect.y = 0;
+                srcrect.w = GW_LCD_WIDTH;
+                srcrect.h = GW_LCD_HEIGHT;
+                SDL_RenderCopyEx(renderer, tex, &srcrect, NULL, 270, 0, SDL_FLIP_NONE);
+            } else
+                SDL_RenderCopy(renderer, tex, NULL, NULL);
+
             SDL_RenderPresent(renderer);
             last_tic = SDL_GetTicks();
         }
@@ -612,15 +631,25 @@ int gw_init(int argc, char **argv)
         romflg = gw_romloader(gw_o_data, size);
     }
 
+    if (argv[2]) {
+        gw_rotate = true;
+    }
+
     if (!romflg)
         return 1;
 
+    int width  = GW_LCD_WIDTH;
+    int height = GW_LCD_HEIGHT;
+    if (gw_rotate) {
+        width  = GW_LCD_WIDTH;
+        height = GW_LCD_WIDTH;
+    }
+
     SDL_Init(SDL_INIT_EVERYTHING);
-    SDL_Window   *window   = SDL_CreateWindow("", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, GW_LCD_WIDTH * SCALE,
-                                              GW_LCD_HEIGHT * SCALE, SDL_WINDOW_SHOWN);
+    SDL_Window   *window   = SDL_CreateWindow("", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, width * SCALE,
+                                              height * SCALE, SDL_WINDOW_SHOWN);
     SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, 0);
-    SDL_Texture  *tex =
-        SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGB565, SDL_TEXTUREACCESS_TARGET, GW_LCD_WIDTH, GW_LCD_HEIGHT);
+    SDL_Texture  *tex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGB565, SDL_TEXTUREACCESS_TARGET, width, height);
     SDL_RenderSetScale(renderer, SCALE, SCALE);
     SDL_SetRenderTarget(renderer, NULL);
 

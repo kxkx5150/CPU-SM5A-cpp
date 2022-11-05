@@ -22,6 +22,7 @@ u32 *gw_segments_offset = NULL;
 u8  *gw_program         = NULL;
 u8  *gw_melody          = NULL;
 u32 *gw_keyboard        = NULL;
+bool gw_rotate          = false;
 
 
 unsigned long lz4_depack(const void *src, void *dst, unsigned long packed_size)
