@@ -30,7 +30,7 @@ rom file
 exe/cpp_app game.gw
 </pre>
 
-milti screen
+multi screen
 
 <pre>
 exe/cpp_app game.gw m
@@ -39,6 +39,13 @@ exe/cpp_app game.gw m
 <br><br><br><br><br><br>
 
 https://user-images.githubusercontent.com/10168979/199822767-d8a1407c-032e-4b7a-b04d-e44577c5a8c1.mp4
+
+
+
+https://user-images.githubusercontent.com/10168979/200128066-91b6dab2-0377-468c-a4b1-10d9adbff36a.mp4
+
+
+
 
 use [MAME](https://github.com/mamedev/mame) as a reference
 
