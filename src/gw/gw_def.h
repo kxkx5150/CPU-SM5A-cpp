@@ -12,7 +12,7 @@
 #define GW_SCREEN_WIDTH  320
 #define GW_SCREEN_HEIGHT 240
 #define GW_REFRESH_RATE  128
-#define SCALE            1
+#define SCALE            2
 #define FRAME_PITCH      (GW_LCD_WIDTH * sizeof(uint16_t))
 
 #define GW_SYS_FREQ            32768U

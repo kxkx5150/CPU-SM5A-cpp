@@ -2,6 +2,7 @@
 #include <cstdio>
 #include <time.h>
 #include <SDL2/SDL.h>
+#include <string>
 #include "gw_romloader.h"
 #include "gw_system.h"
 #include "gw_graphic.h"
@@ -610,6 +611,12 @@ void gw_mainloop(SDL_Window *window, SDL_Renderer *renderer, SDL_Texture *tex)
 }
 int gw_init(int argc, char **argv)
 {
+    if (argc > 2) {
+        std::string argtmp = argv[2];
+        if (argtmp == "m")
+            gw_rotate = true;
+    }
+
     u8  *rom    = nullptr;
     bool romflg = false;
     int  size   = 0;
@@ -629,10 +636,6 @@ int gw_init(int argc, char **argv)
     } else {
         size   = 58121;
         romflg = gw_romloader(gw_o_data, size);
-    }
-
-    if (argv[2]) {
-        gw_rotate = true;
     }
 
     if (!romflg)
